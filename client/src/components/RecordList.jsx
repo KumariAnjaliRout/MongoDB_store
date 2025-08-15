@@ -37,74 +37,111 @@ const Record = (props) => (
 
 export default function RecordList() {
   const [records, setRecords] = useState([]);
-
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
   // This method fetches the records from the database.
   useEffect(() => {
     async function getRecords() {
-      const response = await fetch(`https://mongodb-store-0zkz.onrender.com`);
-      if (!response.ok) {
-        const message = `An error occurred: ${response.statusText}`;
-        console.error(message);
-        return;
+      try {
+        setLoading(true);
+        const response = await fetch(`https://mongodb-store-0zkz.onrender.com/api/records`);
+        
+        if (!response.ok) {
+          throw new Error(`Server responded with status: ${response.status}`);
+        }
+        
+        const records = await response.json();
+        setRecords(records);
+        setError(null);
+      } catch (err) {
+        setError(err.message);
+        console.error("Failed to fetch records:", err);
+      } finally {
+        setLoading(false);
       }
-      const records = await response.json();
-      setRecords(records);
     }
+    
     getRecords();
-    return;
-  }, [records.length]);
-
+  }, []); // Empty dependency array to run only once on mount
+  
   // This method will delete a record
   async function deleteRecord(id) {
-    await fetch(`https://mongodb-store-0zkz.onrender.com${id}`, {
-      method: "DELETE",
-    });
-    const newRecords = records.filter((el) => el._id !== id);
-    setRecords(newRecords);
+    try {
+      const response = await fetch(`https://mongodb-store-0zkz.onrender.com/api/records/${id}`, {
+        method: "DELETE",
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to delete record: ${response.status}`);
+      }
+      
+      // Update the UI by removing the deleted record
+      const newRecords = records.filter((el) => el._id !== id);
+      setRecords(newRecords);
+    } catch (err) {
+      setError(err.message);
+      console.error("Failed to delete record:", err);
+    }
   }
-
+  
   // This method will map out the records on the table
   function recordList() {
-    return records.map((record) => {
-      return (
-        <Record
-          record={record}
-          deleteRecord={() => deleteRecord(record._id)}
-          key={record._id}
-        />
-      );
-    });
+    return records.map((record) => (
+      <Record
+        record={record}
+        deleteRecord={() => deleteRecord(record._id)}
+        key={record._id}
+      />
+    ));
   }
-
+  
   // This following section will display the table with the records of individuals.
   return (
     <>
       <h3 className="text-lg font-semibold p-4">Employee Records</h3>
-      <div className="border rounded-lg overflow-hidden">
-        <div className="relative w-full overflow-auto">
-          <table className="w-full caption-bottom text-sm">
-            <thead className="[&amp;_tr]:border-b">
-              <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&amp;:has([role=checkbox])]:pr-0">
-                  Name
-                </th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&amp;:has([role=checkbox])]:pr-0">
-                  Position
-                </th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&amp;:has([role=checkbox])]:pr-0">
-                  Level
-                </th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&amp;:has([role=checkbox])]:pr-0">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody className="[&amp;_tr:last-child]:border-0">
-              {recordList()}
-            </tbody>
-          </table>
+      
+      {error && (
+        <div className="bg-red-50 text-red-700 p-4 mb-4 rounded-lg">
+          Error: {error}
         </div>
-      </div>
+      )}
+      
+      {loading ? (
+        <div className="p-4">Loading records...</div>
+      ) : (
+        <div className="border rounded-lg overflow-hidden">
+          <div className="relative w-full overflow-auto">
+            <table className="w-full caption-bottom text-sm">
+              <thead className="[&amp;_tr]:border-b">
+                <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&amp;:has([role=checkbox])]:pr-0">
+                    Name
+                  </th>
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&amp;:has([role=checkbox])]:pr-0">
+                    Position
+                  </th>
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&amp;:has([role=checkbox])]:pr-0">
+                    Level
+                  </th>
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&amp;:has([role=checkbox])]:pr-0">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="[&amp;_tr:last-child]:border-0">
+                {records.length > 0 ? recordList() : (
+                  <tr>
+                    <td colSpan="4" className="p-4 text-center text-gray-500">
+                      No records found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </>
   );
 }
